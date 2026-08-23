@@ -25,6 +25,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'is_active',
     ];
 
     /**
@@ -88,5 +89,13 @@ class User extends Authenticatable
     public function programmerAssignments()
     {
         return $this->hasMany(TicketAssignment::class, 'programmer_id');
+    }
+
+    /**
+     * Override password reset notification to point to React frontend.
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new \App\Notifications\ResetPasswordNotification($token));
     }
 }

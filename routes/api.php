@@ -4,10 +4,15 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\TicketController;
+use App\Http\Controllers\AdminController;
 use App\Models\User;
 
-// Public Auth Route
+// Public Auth Routes
 Route::post('/login', [AuthController::class, 'login']);
+
+// Public: Forgot Password (Client self-service via email)
+Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+Route::post('/reset-password', [AuthController::class, 'resetPasswordFromToken']);
 
 // Authenticated Routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -74,4 +79,20 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/programmers', function () {
         return response()->json(User::where('role', 'programmer')->get(['id', 'name', 'email']));
     })->middleware('role:project_manager');
+
+    // ─── Admin RBAC Routes ────────────────────────────────────────────────────────
+    Route::middleware('role:admin')->prefix('admin')->group(function () {
+        // User Management
+        Route::get('/users', [AdminController::class, 'getUsers']);
+        Route::post('/users', [AdminController::class, 'createUser']);
+        Route::put('/users/{user}', [AdminController::class, 'updateUser']);
+        Route::patch('/users/{user}/toggle-active', [AdminController::class, 'toggleActive']);
+        Route::post('/users/{user}/reset-password', [AdminController::class, 'resetPassword']);
+
+        // System Monitoring
+        Route::get('/stats', [AdminController::class, 'getStats']);
+
+        // Activity Logs
+        Route::get('/activity-logs', [AdminController::class, 'getActivityLogs']);
+    });
 });

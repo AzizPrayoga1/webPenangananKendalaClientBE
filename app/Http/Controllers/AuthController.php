@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -12,7 +14,7 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $request->validate([
-            'email' => 'required|email',
+            'email'    => 'required|email',
             'password' => 'required',
         ]);
 
@@ -24,12 +26,19 @@ class AuthController extends Controller
             ]);
         }
 
+        // Block deactivated accounts
+        if (! $user->is_active) {
+            throw ValidationException::withMessages([
+                'email' => ['Akun Anda telah dinonaktifkan. Hubungi administrator untuk informasi lebih lanjut.'],
+            ]);
+        }
+
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
             'access_token' => $token,
-            'token_type' => 'Bearer',
-            'user' => $user,
+            'token_type'   => 'Bearer',
+            'user'         => $user,
         ]);
     }
 
@@ -38,7 +47,7 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()->delete();
 
         return response()->json([
-            'message' => 'Logged out successfully'
+            'message' => 'Logged out successfully',
         ]);
     }
 
@@ -52,11 +61,11 @@ class AuthController extends Controller
         $user = $request->user();
 
         $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|max:255|unique:users,email,' . $user->id,
+            'name'             => 'required|string|max:255',
+            'email'            => 'required|email|max:255|unique:users,email,' . $user->id,
             'current_password' => 'required|string',
         ], [
-            'email.unique' => 'Alamat email sudah digunakan oleh akun lain.',
+            'email.unique'             => 'Alamat email sudah digunakan oleh akun lain.',
             'current_password.required' => 'Masukkan password saat ini untuk mengonfirmasi perubahan profil.',
         ]);
 
@@ -67,13 +76,13 @@ class AuthController extends Controller
         }
 
         $user->update([
-            'name' => $request->name,
+            'name'  => $request->name,
             'email' => $request->email,
         ]);
 
         return response()->json([
             'message' => 'Profil berhasil diperbarui.',
-            'user' => $user,
+            'user'    => $user,
         ]);
     }
 
@@ -83,9 +92,9 @@ class AuthController extends Controller
 
         $request->validate([
             'current_password' => 'required|string',
-            'new_password' => 'required|string|min:8|confirmed',
+            'new_password'     => 'required|string|min:8|confirmed',
         ], [
-            'new_password.min' => 'Password baru minimal harus 8 karakter.',
+            'new_password.min'       => 'Password baru minimal harus 8 karakter.',
             'new_password.confirmed' => 'Konfirmasi password baru tidak cocok.',
             'current_password.required' => 'Masukkan password saat ini.',
         ]);
@@ -102,7 +111,68 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Password berhasil diperbarui.',
-            'user' => $user,
+            'user'    => $user,
+        ]);
+    }
+
+    // ─── Forgot Password (Client self-service via email) ─────────────────────────
+    public function forgotPassword(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        // Always return success to prevent email enumeration
+        if (! $user || $user->role !== 'client') {
+            return response()->json([
+                'message' => 'Jika email terdaftar sebagai akun Client, link reset password telah dikirimkan.',
+            ]);
+        }
+
+        $status = Password::broker()->sendResetLink(
+            $request->only('email')
+        );
+
+        return response()->json([
+            'message' => 'Jika email terdaftar sebagai akun Client, link reset password telah dikirimkan.',
+        ]);
+    }
+
+    // ─── Reset Password from Email Link ──────────────────────────────────────────
+    public function resetPasswordFromToken(Request $request)
+    {
+        $request->validate([
+            'token'                 => 'required',
+            'email'                 => 'required|email',
+            'password'              => 'required|string|min:8|confirmed',
+        ], [
+            'password.min'       => 'Password baru minimal 8 karakter.',
+            'password.confirmed' => 'Konfirmasi password tidak cocok.',
+        ]);
+
+        $status = Password::broker()->reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function ($user) use ($request) {
+                $user->forceFill([
+                    'password'       => Hash::make($request->password),
+                    'remember_token' => Str::random(60),
+                ])->save();
+
+                // Revoke all existing tokens for security
+                $user->tokens()->delete();
+            }
+        );
+
+        if ($status === Password::PASSWORD_RESET) {
+            return response()->json([
+                'message' => 'Password berhasil direset. Silakan login dengan password baru Anda.',
+            ]);
+        }
+
+        throw ValidationException::withMessages([
+            'email' => [__($status)],
         ]);
     }
 }

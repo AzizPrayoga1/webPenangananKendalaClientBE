@@ -67,9 +67,21 @@ class DatabaseSeeder extends Seeder
         User::firstOrCreate(
             ['email' => 'client@example.com'],
             [
-                'name' => 'Corporate Client',
-                'password' => Hash::make('password'),
-                'role' => 'client',
+                'name'      => 'Corporate Client',
+                'password'  => Hash::make('password'),
+                'role'      => 'client',
+                'is_active' => true,
+            ]
+        );
+
+        // Admin (RBAC Administrator)
+        User::firstOrCreate(
+            ['email' => 'admin@example.com'],
+            [
+                'name'      => 'System Administrator',
+                'password'  => Hash::make('password'),
+                'role'      => 'admin',
+                'is_active' => true,
             ]
         );
     }
