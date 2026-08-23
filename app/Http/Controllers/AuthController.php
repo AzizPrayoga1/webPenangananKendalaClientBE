@@ -124,19 +124,26 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        // Always return success to prevent email enumeration
+        // Always return success if user not found or not client to prevent email enumeration
         if (! $user || $user->role !== 'client') {
             return response()->json([
-                'message' => 'Jika email terdaftar sebagai akun Client, link reset password telah dikirimkan.',
+                'message' => 'Jika email terdaftar sebagai akun Client, link reset password telah dikirimkan ke email Anda.',
             ]);
         }
 
-        $status = Password::broker()->sendResetLink(
-            $request->only('email')
-        );
+        try {
+            Password::broker()->sendResetLink(
+                $request->only('email')
+            );
+        } catch (\Throwable $e) {
+            \Log::error('SMTP Email Error: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Gagal mengirimkan email reset password. Pastikan kredensial SMTP di backend sudah benar.',
+            ], 500);
+        }
 
         return response()->json([
-            'message' => 'Jika email terdaftar sebagai akun Client, link reset password telah dikirimkan.',
+            'message' => 'Jika email terdaftar sebagai akun Client, link reset password telah dikirimkan ke email Anda.',
         ]);
     }
 

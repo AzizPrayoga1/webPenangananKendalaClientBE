@@ -3,7 +3,6 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -30,11 +29,9 @@ class ResetPasswordNotification extends Notification
 
         return (new MailMessage)
             ->subject('Reset Password Akun Client — TicketingFlow')
-            ->greeting('Halo, ' . $notifiable->name . '!')
-            ->line('Anda menerima email ini karena kami menerima permintaan reset password untuk akun Anda.')
-            ->action('Reset Password', $resetUrl)
-            ->line('Link ini akan kedaluwarsa dalam 60 menit.')
-            ->line('Jika Anda tidak meminta reset password, abaikan email ini — tidak ada tindakan yang perlu dilakukan.')
-            ->salutation('Hormat kami, Tim TicketingFlow');
+            ->view('emails.reset-password', [
+                'user'     => $notifiable,
+                'resetUrl' => $resetUrl,
+            ]);
     }
 }

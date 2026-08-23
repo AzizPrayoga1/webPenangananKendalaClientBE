@@ -10,8 +10,8 @@ use App\Models\User;
 // Public Auth Routes
 Route::post('/login', [AuthController::class, 'login']);
 
-// Public: Forgot Password (Client self-service via email)
-Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+// Public: Forgot Password (Client self-service via email with rate limiting)
+Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
 Route::post('/reset-password', [AuthController::class, 'resetPasswordFromToken']);
 
 // Authenticated Routes
