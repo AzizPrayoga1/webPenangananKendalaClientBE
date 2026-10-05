@@ -4,8 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\PushSubscription;
-use Minishlink\WebPush\WebPush;
-use Minishlink\WebPush\Subscription;
+use Symfony\Component\Process\Process;
 use Illuminate\Support\Facades\Log;
 
 class PushSubscriptionController extends Controller
@@ -60,18 +59,16 @@ class PushSubscriptionController extends Controller
         })->get();
 
         if ($subscriptions->isEmpty()) {
-            return response()->json(['message' => 'No active push subscriptions found for this user.'], 404);
+            return response()->json([
+                'message' => 'Belum ada browser yang terdaftar untuk push notification. Klik tombol "Aktifkan Izin Web Push" terlebih dahulu di browser Anda.'
+            ], 404);
         }
 
-        $auth = [
-            'VAPID' => [
-                'subject' => env('VAPID_SUBJECT', 'mailto:admin@example.com'),
-                'publicKey' => env('VAPID_PUBLIC_KEY'),
-                'privateKey' => env('VAPID_PRIVATE_KEY'),
-            ],
+        $vapid = [
+            'subject' => env('VAPID_SUBJECT', 'mailto:admin@example.com'),
+            'publicKey' => env('VAPID_PUBLIC_KEY', 'BCoDaIqs1n_d3g97zGZxA998RUzN9bKD1gRMKa3qWtqKbwgsubWxBmJNMU5uxqM59Rrtmodvp6ziWyDjiRv0UuQ'),
+            'privateKey' => env('VAPID_PRIVATE_KEY', '_MTFLwZXLmu1K08k_UUM9WvXpFA8NJwrXWwBKMRNris'),
         ];
-
-        $webPush = new WebPush($auth);
 
         $payload = json_encode([
             'title' => '🔔 Notifikasi Sistem Kendala Client',
@@ -85,27 +82,36 @@ class PushSubscriptionController extends Controller
         ]);
 
         $sentCount = 0;
+        $scriptPath = base_path('scripts/send_push.cjs');
+
         foreach ($subscriptions as $sub) {
-            $webPushSubscription = Subscription::create([
+            $subData = [
                 'endpoint' => $sub->endpoint,
-                'publicKey' => $sub->public_key,
-                'authToken' => $sub->auth_token,
-                'contentEncoding' => $sub->content_encoding ?: 'aesgcm',
+                'keys' => [
+                    'p256dh' => $sub->public_key,
+                    'auth' => $sub->auth_token,
+                ]
+            ];
+
+            $process = new Process([
+                'node',
+                $scriptPath,
+                json_encode($subData),
+                $payload,
+                json_encode($vapid)
             ]);
 
-            $webPush->queueNotification($webPushSubscription, $payload);
-        }
+            $process->run();
 
-        foreach ($webPush->flush() as $report) {
-            if ($report->isSuccess()) {
+            if ($process->isSuccessful()) {
                 $sentCount++;
             } else {
-                Log::warning("[WebPush] Target failed: {$report->getReason()}");
+                Log::warning("[WebPush] Target failed: " . $process->getErrorOutput());
             }
         }
 
         return response()->json([
-            'message' => "Web Push notification sent to {$sentCount} active devices!",
+            'message' => "Web Push notification berhasil dikirim ke {$sentCount} perangkat aktif!",
             'sent_count' => $sentCount
         ]);
     }
