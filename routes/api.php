@@ -11,6 +11,26 @@ use App\Models\User;
 // Public Auth Routes
 Route::post('/login', [AuthController::class, 'login']);
 Route::get('/vapid-public-key', [PushSubscriptionController::class, 'getPublicKey']);
+Route::get('/health', function () {
+    $dbOk = true;
+    try {
+        \Illuminate\Support\Facades\DB::connection()->getPdo();
+    } catch (\Throwable $e) {
+        $dbOk = false;
+    }
+
+    return response()->json([
+        'status' => 'ok',
+        'service' => 'Penanganan Kendala Client API',
+        'version' => '1.0.0',
+        'timestamp' => now()->toISOString(),
+        'php_version' => PHP_VERSION,
+        'environment' => config('app.env'),
+        'pwa_ready' => true,
+        'database_connected' => $dbOk,
+        'vapid_configured' => !empty(env('VAPID_PUBLIC_KEY'))
+    ]);
+});
 
 // Public: Forgot Password (Client self-service via email with rate limiting)
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
