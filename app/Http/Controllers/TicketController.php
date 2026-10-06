@@ -16,6 +16,11 @@ class TicketController extends Controller
     {
         $user = $request->user();
 
+        // Strict access check for Client role (Must use /api/client/tickets)
+        if ($user->role === 'client') {
+            return response()->json(['message' => 'Unauthorized. Client must use public client endpoint.'], 403);
+        }
+
         $query = Ticket::with(['creator', 'claimedProgrammer', 'assignments.programmer', 'assignments.pm', 'progressLogs.user'])
             ->orderBy('created_at', 'desc');
 
@@ -28,9 +33,6 @@ class TicketController extends Controller
                     $sq->where('user_id', $user->id);
                 });
             });
-        } elseif ($user->role === 'client') {
-            // Clients can only see their own tickets
-            $query->where('user_id', $user->id);
         } elseif ($user->role === 'project_manager' || $user->role === 'owner') {
             // PM and Owner only see escalated/assigned/progress/resolved/closed tickets, not raw open ones
             $query->where('status', '!=', 'open');
