@@ -14,8 +14,16 @@ class PushSubscriptionController extends Controller
      */
     public function getPublicKey()
     {
+        $publicKey = config('services.webpush.public_key') ?: env('VAPID_PUBLIC_KEY');
+
+        if (empty($publicKey)) {
+            return response()->json([
+                'message' => 'VAPID public key belum dikonfigurasi di server.'
+            ], 500);
+        }
+
         return response()->json([
-            'publicKey' => env('VAPID_PUBLIC_KEY', 'BCoDaIqs1n_d3g97zGZxA998RUzN9bKD1gRMKa3qWtqKbwgsubWxBmJNMU5uxqM59Rrtmodvp6ziWyDjiRv0UuQ')
+            'publicKey' => $publicKey
         ]);
     }
 
@@ -65,10 +73,16 @@ class PushSubscriptionController extends Controller
         }
 
         $vapid = [
-            'subject' => env('VAPID_SUBJECT', 'mailto:admin@example.com'),
-            'publicKey' => env('VAPID_PUBLIC_KEY', 'BCoDaIqs1n_d3g97zGZxA998RUzN9bKD1gRMKa3qWtqKbwgsubWxBmJNMU5uxqM59Rrtmodvp6ziWyDjiRv0UuQ'),
-            'privateKey' => env('VAPID_PRIVATE_KEY', '_MTFLwZXLmu1K08k_UUM9WvXpFA8NJwrXWwBKMRNris'),
+            'subject' => config('services.webpush.subject') ?: env('VAPID_SUBJECT', 'mailto:admin@example.com'),
+            'publicKey' => config('services.webpush.public_key') ?: env('VAPID_PUBLIC_KEY'),
+            'privateKey' => config('services.webpush.private_key') ?: env('VAPID_PRIVATE_KEY'),
         ];
+
+        if (empty($vapid['publicKey']) || empty($vapid['privateKey'])) {
+            return response()->json([
+                'message' => 'Konfigurasi VAPID keys belum lengkap di server.'
+            ], 500);
+        }
 
         $payload = json_encode([
             'title' => '🔔 Notifikasi Sistem Kendala Client',
